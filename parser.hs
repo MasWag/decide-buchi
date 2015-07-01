@@ -1,7 +1,8 @@
-module Parser where
+import qualified Data.List as L
 import Data.GraphViz
 import Data.GraphViz.Attributes.Complete
 import Data.Text.Lazy
+import qualified Data.Text.Lazy.IO as TI
 import Data.Map.Strict
 
 type LabelType = String
@@ -21,8 +22,22 @@ textToGraph :: Data.Text.Lazy.Text -> AutoMata
 textToGraph txt = parseDotGraph txt
 
 findLasso :: AutoMata -> [LabelType]
-findLasso automata = Prelude.map nodeID $ nextStates ! Prelude.head states -- Stub
+findLasso automata = Prelude.map nodeID $ L.foldl' (\ li root -> if li == [] then 
+                                                                     searchLasso root root []
+                                                                 else li) 
+                     [] acceptingStates
     where
+      -- Depth First Search
+      searchLasso :: State -> State -> [State] -> [State]
+      searchLasso root now hist 
+          | root == now && hist /=[] =  L.reverse $ now:hist
+          | elem now hist =  []
+          | otherwise      = L.foldl' (\ l s -> 
+                                           if l /= [] then
+                                               l
+                                           else
+                                               searchLasso root s (now:hist)
+                                      ) [] $ nextStates ! now
       nextStates :: Map State [State]
       nextStates = fromList nextStatesList
       nextStatesList = [(from,[to |
@@ -35,7 +50,15 @@ findLasso automata = Prelude.map nodeID $ nextStates ! Prelude.head states -- St
       states = graphNodes automata
       transitions = graphEdges automata
 
-finite_state_machine = "\
+main :: IO ()
+main = do
+    lasso <- findLasso <$> textToGraph  <$> TI.getContents
+    if lasso == [] then
+        putStrLn "There is no accepting path."
+    else
+        putStrLn $ "Found accepting path:" ++ (show lasso) 
+
+sampleAutomata = "\
 \digraph finite_state_machine {\
 \    rankdir=LR;\
 \    size=\"8,5\"\
